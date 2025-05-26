@@ -21,7 +21,7 @@ def connect_mysql():
     try:
         # Create connection
         conn = pymysql.connect(
-            host='localhost',
+            host='Gtalen.mysql.pythonanywhere-services.com',
             user=username,
             password=password,
             database=database,  # SQL database name
