@@ -1,0 +1,162 @@
+{% extends 'ipm_base.html' %}
+
+{% block title %}Stocks{% endblock %}
+
+{% block content %}
+
+  <h3 class="mb-4">Stocks Management</h3>
+
+  <!-- Create New Stock Form -->
+  <h5 class="mb-4">Create New Stock</h5>
+  <form id="createStockForm" class="mb-4">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <input type="text" id="stock_symbol" class="form-control" placeholder="Stock Symbol" required />
+      </div>
+      <div class="col-md-6">
+        <input type="text" id="stock_short_name" class="form-control" placeholder="Stock Short Name" required />
+      </div>
+      <div class="col-md-6">
+        <input type="text" id="stock_company_name" class="form-control" placeholder="Stock Company Name" required />
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Create Stock</button>
+    <button type="reset" class="btn btn-secondary mt-3">Reset</button>
+  </form>
+
+  <!-- Get All Stocks -->
+  <div class="mt-3">
+    <button id="get-all-stocks-btn" class="btn btn-info">List All Stocks</button>
+  </div>
+
+  <!-- Stock List Table -->
+  <table id="stocks-table" class="table table-striped mt-4">
+    <thead>
+      <tr>
+        <th>Stock ID</th>
+        <th>Stock Symbol</th>
+        <th>Short Name</th>
+        <th>Company Name</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  {% endblock %}
+
+
+  {% block scripts %}
+  <script>
+    function loadStocks() {
+      $.ajax({
+        url: '/api/stocks',
+        type: 'GET',
+        success: function(response) {
+          const tbody = $('#stocks-table tbody');
+          tbody.empty();
+          response.forEach(stock => {
+            tbody.append(`
+              <tr>
+                <td>${stock.stock_id}</td>
+                <td>${stock.stock_symbol}</td>
+                <td>${stock.stock_short_name}</td>
+                <td>${stock.stock_company_name}</td>
+                <td>
+                  <button class="btn btn-warning btn-sm update-btn" data-id="${stock.stock_id}" data-symbol="${stock.stock_symbol}" data-short="${stock.stock_short_name}" data-company="${stock.stock_company_name}">Update</button>
+                  <button class="btn btn-danger btn-sm delete-btn" data-id="${stock.stock_id}">Delete</button>
+                </td>
+              </tr>
+            `);
+          });
+        },
+        error: function(xhr) {
+          alert('Failed to fetch stocks: ' + xhr.responseText);
+        }
+      });
+    }
+
+    $(document).ready(function() {
+      // Create new stock
+      $('#createStockForm').on('submit', function(event) {
+        event.preventDefault();
+        const stockData = {
+          stock_symbol: $('#stock_symbol').val(),
+          stock_short_name: $('#stock_short_name').val(),
+          stock_company_name: $('#stock_company_name').val()
+        };
+        $.ajax({
+          url: '/api/stocks',
+          type: 'POST',
+          contentType: 'application/json',
+          data: JSON.stringify(stockData),
+          success: function(response) {
+            alert('Stock created successfully!');
+            $('#createStockForm')[0].reset();
+            loadStocks();
+          },
+          error: function(xhr) {
+            alert('Failed to create stock: ' + xhr.responseText);
+          }
+        });
+      });
+
+      // Load all stocks
+      $('#get-all-stocks-btn').on('click', function() {
+        loadStocks();
+      });
+
+      // Delegate update button
+      $(document).on('click', '.update-btn', function() {
+        const stockId = $(this).data('id');
+        const oldSymbol = $(this).data('symbol');
+        const oldShort = $(this).data('short');
+        const oldCompany = $(this).data('company');
+
+        const stock_symbol = prompt("Update Stock Symbol:", oldSymbol);
+        const stock_short_name = prompt("Update Short Name:", oldShort);
+        const stock_company_name = prompt("Update Company Name:", oldCompany);
+
+        if (!stock_symbol || !stock_short_name || !stock_company_name) {
+          alert("Update canceled or missing values.");
+          return;
+        }
+
+        $.ajax({
+          url: `/api/stocks/${stockId}`,
+          type: 'PUT',
+          contentType: 'application/json',
+          data: JSON.stringify({
+            stock_symbol,
+            stock_short_name,
+            stock_company_name
+          }),
+          success: function() {
+            alert("Stock updated successfully.");
+            loadStocks();
+          },
+          error: function(xhr) {
+            alert("Failed to update stock: " + xhr.responseText);
+          }
+        });
+      });
+
+      // Delegate delete button
+      $(document).on('click', '.delete-btn', function() {
+        const stockId = $(this).data('id');
+        if (confirm("Are you sure you want to delete this stock?")) {
+          $.ajax({
+            url: `/api/stocks/${stockId}`,
+            type: 'DELETE',
+            success: function() {
+              alert("Stock deleted successfully.");
+              loadStocks();
+            },
+            error: function(xhr) {
+              alert("Failed to delete stock: " + xhr.responseText);
+            }
+          });
+        }
+      });
+    });
+  </script>
+{% endblock %}

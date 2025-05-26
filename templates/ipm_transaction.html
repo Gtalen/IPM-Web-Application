@@ -1,0 +1,212 @@
+{% extends 'ipm_base.html' %}
+
+{% block title %}Transactions{% endblock %}
+
+{% block content %}
+
+<h3 class="mb-4">Transaction Management</h3>
+
+
+<!-- Create New Transaction Form -->
+  <h5 class="mb-4">Create New Transaction</h5>
+  <form id="createTransactionForm" class="mb-4">
+    <div class="row g-3">
+      <div class="col-md-6">
+        <input type="number" id="user_id" class="form-control" placeholder="User ID" required />
+      </div>
+      <div class="col-md-6">
+        <select id="stock_symbol" class="form-select" required>
+          <option value="" disabled selected>Select Stock Symbol</option>
+        </select>
+      </div>
+      <input type="hidden" id="stock_id" />
+      <div class="col-md-6">
+        <select id="transaction_type" class="form-select" required>
+          <option value="" disabled selected>Select Transaction Type</option>
+          <option value="buy">Buy</option>
+          <option value="sell">Sell</option>
+        </select>
+      </div>
+      <div class="col-md-6">
+        <input type="number" id="quantity" class="form-control" placeholder="Quantity" required />
+      </div>
+      <div class="col-md-6">
+        <input type="number" step="0.01" id="price_per_share" class="form-control" placeholder="Price per Share" readonly required />
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary mt-3">Create Transaction</button>
+    <button type="reset" class="btn btn-secondary mt-3">Reset</button>
+  </form>
+
+  <!-- Fetch Transactions -->
+  <div class="mb-3">
+    <input type="number" id="fetch_user_id" class="form-control d-inline-block" style="width: 250px;" placeholder="Enter User ID to fetch transactions" />
+    <button id="fetch-transactions-btn" class="btn btn-info">Get Transactions</button>
+  </div>
+
+  <!-- Transactions Table -->
+  <table id="transactions-table" class="table table-striped">
+    <thead>
+      <tr>
+        <th>Transaction ID</th>
+        <th>User ID</th>
+        <th>Stock ID</th>
+        <th>Stock Symbol</th>
+        <th>Transaction Type</th>
+        <th>Quantity</th>
+        <th>Price per Share</th>
+        <th>Transaction Date</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let stocks = [];
+    let transactions = [];
+
+    // Load stocks for dropdown on page load
+    async function loadStocks() {
+      try {
+        const res = await fetch('/api/stocks');
+        if (!res.ok) throw new Error(`Failed to load stocks: ${res.statusText}`);
+        stocks = await res.json();
+
+        const stockSelect = document.getElementById('stock_symbol');
+        stocks.forEach(stock => {
+          const option = document.createElement('option');
+          option.value = stock.stock_id;
+          option.textContent = `${stock.stock_symbol} - ${stock.stock_company_name}`;
+          stockSelect.appendChild(option);
+        });
+      } catch (err) {
+        alert('Error loading stocks: ' + err.message);
+        console.error(err);
+      }
+    }
+
+    // Update hidden stock_id and price when stock symbol changes
+    document.getElementById('stock_symbol').addEventListener('change', (event) => {
+      const selectedStockId = parseInt(event.target.value);
+      const selectedStock = stocks.find(s => s.stock_id === selectedStockId);
+      if (selectedStock) {
+        document.getElementById('stock_id').value = selectedStock.stock_id;
+
+        if (selectedStock.price_per_share) {
+          const priceNum = Number(selectedStock.price_per_share);
+          document.getElementById('price_per_share').value = !isNaN(priceNum) ? priceNum.toFixed(2) : '';
+        } else {
+          document.getElementById('price_per_share').value = '';
+        }
+      }
+    });
+
+    // Handle Create Transaction form submission
+    document.getElementById('createTransactionForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const userId = parseInt(document.getElementById('user_id').value);
+      const stockId = parseInt(document.getElementById('stock_id').value);
+      const transactionType = document.getElementById('transaction_type').value;
+      const quantity = parseInt(document.getElementById('quantity').value);
+
+      if (transactionType === 'sell') {
+        try {
+          const res = await fetch(`/api/user_stock_holding?user_id=${userId}&stock_id=${stockId}`);
+          const data = await res.json();
+          if (!res.ok || data.holding === undefined) {
+            alert('Failed to check holdings before selling.');
+            return;
+          }
+          if (quantity > data.holding) {
+            alert(`Insufficient stock to sell. You only have ${data.holding} shares.`);
+            return;
+          }
+        } catch (err) {
+          alert('Error checking holdings: ' + err.message);
+          return;
+        }
+      }
+
+      const data = {
+        user_id: userId,
+        stock_id: stockId,
+        transaction_type: transactionType,
+        quantity: quantity,
+        price_per_share: parseFloat(document.getElementById('price_per_share').value)
+      };
+
+      try {
+        const res = await fetch('/api/transactions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+
+        if (res.ok) {
+          alert('Transaction created successfully!');
+          e.target.reset();
+          document.getElementById('price_per_share').value = '';
+          document.getElementById('stock_id').value = '';
+        } else {
+          const errorData = await res.json();
+          alert('Error creating transaction: ' + (errorData.error || 'Unknown error'));
+        }
+      } catch (err) {
+        alert('Network error: ' + err.message);
+      }
+    });
+
+    // Render transactions in the table
+    function renderTransactions() {
+      const tbody = document.querySelector('#transactions-table tbody');
+      tbody.innerHTML = '';
+
+      transactions.forEach(tx => {
+        const tr = document.createElement('tr');
+        const date = new Date(tx.transaction_date).toLocaleDateString();
+        tr.innerHTML = `
+          <td>${tx.transaction_id}</td>
+          <td>${tx.user_id}</td>
+          <td>${tx.stock_id}</td>
+          <td>${tx.stock_symbol || ''}</td>
+          <td>${tx.transaction_type}</td>
+          <td>${tx.quantity}</td>
+          <td>${tx.price_per_share != null && !isNaN(tx.price_per_share) ? Number(tx.price_per_share).toFixed(2) : 'N/A'}</td>
+          <td>${date}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Fetch transactions by user ID and render them
+    document.getElementById('fetch-transactions-btn').addEventListener('click', async () => {
+      const userId = document.getElementById('fetch_user_id').value.trim();
+      if (!userId) {
+        alert('Please enter a User ID to fetch transactions');
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/transactions/user/${userId}`);
+        if (!res.ok) {
+          alert('Failed to fetch transactions for that user');
+          return;
+        }
+
+        transactions = await res.json();
+        if (transactions.length === 0) {
+          alert('No transactions found for this user.');
+          // Clear table if none found
+          document.querySelector('#transactions-table tbody').innerHTML = '';
+        } else {
+          renderTransactions();
+        }
+      } catch (error) {
+        alert('Error fetching transactions: ' + error.message);
+      }
+    });
+
+    window.onload = loadStocks;
+  </script>
+{% endblock %}
