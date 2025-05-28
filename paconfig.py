@@ -1,3 +1,3 @@
 username = "Gtalen"
-password = "Igwagu1990#"
+password = ""
 database = "Gtalen$investment_portfolio_db"
