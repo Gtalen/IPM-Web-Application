@@ -5,18 +5,23 @@ DATA ACCESS OBJECT (DAO) FOR TRANSACTIONS TABLE - Investment Portfolio Managemen
 Author: Ebelechukwu Igwagu
 ---------------------------
 This module provides the Data Access Object (DAO) for the transactions table in the IPM system.
-It includes methods for creating, reading, updating, and deleting (CRUD) transactions in the investment portfolio management system.
+It includes methods for creating, reading, updating, and deleting (CRUD) transactions.
 """
 
+from db_pool import get_connection  # 🔄 Use pooled connection
 import pymysql
-import sql_connect
 
-# DAO class for handling transactions in the investment portfolio management system
 
 class TransactionsDAO:
-
     def __init__(self):
-        self.conn = sql_connect.connect_mysql()
+        self.conn = get_connection()
+
+    def ensure_connection(self):
+        """Reconnect if the connection has gone away."""
+        try:
+            self.conn.ping(reconnect=True)
+        except Exception:
+            self.conn = get_connection()
 
     def close(self):
         if self.conn:
@@ -26,6 +31,7 @@ class TransactionsDAO:
         """
         transaction_data: (user_id, stock_id, transaction_type, quantity, price_per_share)
         """
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -40,17 +46,16 @@ class TransactionsDAO:
             self.conn.rollback()
             return None
 
-
-        
     def get_transaction_by_id(self, transaction_id):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
-                      SELECT t.transaction_id, t.stock_id, s.stock_symbol, t.transaction_type, t.quantity, t.price_per_share, t.transaction_date
-                      FROM transactions t 
-                      INNER JOIN stocks s 
-                      ON t.stock_id = s.stock_id 
-                      WHERE t.transaction_id = %s
+                    SELECT t.transaction_id, t.stock_id, s.stock_symbol,
+                           t.transaction_type, t.quantity, t.price_per_share, t.transaction_date
+                    FROM transactions t
+                    INNER JOIN stocks s ON t.stock_id = s.stock_id
+                    WHERE t.transaction_id = %s
                 """
                 cursor.execute(sql, (transaction_id,))
                 return cursor.fetchone()
@@ -59,30 +64,32 @@ class TransactionsDAO:
             return None
 
     def get_transactions_by_user_id(self, user_id):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
-                sql ="""
-                      SELECT t.transaction_id, t.user_id, t.stock_id, s.stock_symbol, t.transaction_type, t.quantity, t.price_per_share, t.transaction_date
-                      FROM transactions t 
-                      INNER JOIN stocks s 
-                      ON t.stock_id = s.stock_id 
-                      WHERE user_id = %s
+                sql = """
+                    SELECT t.transaction_id, t.user_id, t.stock_id, s.stock_symbol,
+                           t.transaction_type, t.quantity, t.price_per_share, t.transaction_date
+                    FROM transactions t
+                    INNER JOIN stocks s ON t.stock_id = s.stock_id
+                    WHERE t.user_id = %s
                 """
                 cursor.execute(sql, (user_id,))
                 return cursor.fetchall()
         except pymysql.MySQLError as e:
             print(f"[ERROR] get_transactions_by_user_id: {e}")
             return None
-   
+
     def get_transactions_by_stock_id(self, stock_id):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
-                sql ="""
-                      SELECT t.transaction_id, t.user_id, t.stock_id, s.stock_symbol, t.transaction_type, t.quantity, t.price_per_share, t.transaction_date
-                      FROM transactions t 
-                      INNER JOIN stocks s 
-                      ON t.stock_id = s.stock_id 
-                      WHERE stock_id = %s
+                sql = """
+                    SELECT t.transaction_id, t.user_id, t.stock_id, s.stock_symbol,
+                           t.transaction_type, t.quantity, t.price_per_share, t.transaction_date
+                    FROM transactions t
+                    INNER JOIN stocks s ON t.stock_id = s.stock_id
+                    WHERE t.stock_id = %s
                 """
                 cursor.execute(sql, (stock_id,))
                 return cursor.fetchall()
@@ -91,6 +98,7 @@ class TransactionsDAO:
             return None
 
     def update_transaction_quantity(self, transaction_id, new_quantity):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -107,6 +115,7 @@ class TransactionsDAO:
             return None
 
     def update_transaction_price(self, transaction_id, new_price):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -123,6 +132,7 @@ class TransactionsDAO:
             return None
 
     def delete_transaction(self, transaction_id):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = "DELETE FROM transactions WHERE transaction_id = %s"
@@ -133,5 +143,7 @@ class TransactionsDAO:
             print(f"[ERROR] delete_transaction: {e}")
             self.conn.rollback()
             return None
-        
+
+
+# Instantiate DAO
 transactions_dao = TransactionsDAO()

@@ -5,16 +5,24 @@ DATA ACCESS OBJECT (DAO) FOR USERS TABLE - Investment Portfolio Management (IPM)
 Author: Ebelechukwu Igwagu
 ---------------------------
 This module provides the Data Access Object (DAO) for the Users table in the IPM system.
-It includes methods for creating, reading, updating, and deleting (CRUD) user records in the investment portfolio management system.
+It includes methods for creating, reading, updating, and deleting (CRUD) user records in 
+the investment portfolio management system.
 """
 
+from db_pool import get_connection  # Updated to use pooled connection
 import pymysql
-import sql_connect # Connect to MySQL database
 from werkzeug.security import generate_password_hash
 
 class UsersDAO:
     def __init__(self):
-        self.conn = sql_connect.connect_mysql()
+        self.conn = get_connection()
+
+    def ensure_connection(self):
+        """Reconnect if the connection has gone away."""
+        try:
+            self.conn.ping(reconnect=True)
+        except Exception:
+            self.conn = get_connection()
 
     def close(self):
         if self.conn:
@@ -25,6 +33,7 @@ class UsersDAO:
         user_data: dict containing keys
         ('fullname', 'username', 'email', 'password_hash', 'dob')
         """
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -45,8 +54,8 @@ class UsersDAO:
             self.conn.rollback()
             return None
 
-
     def get_all_users(self):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -58,8 +67,9 @@ class UsersDAO:
         except pymysql.MySQLError as e:
             print(f"[ERROR] get_all_users: {e}")
             return None 
-        
+
     def get_user_by_id(self, user_id):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -74,6 +84,7 @@ class UsersDAO:
             return None
 
     def get_user_by_email(self, email):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -86,10 +97,9 @@ class UsersDAO:
         except pymysql.MySQLError as e:
             print(f"[ERROR] get_user_by_email: {e}")
             return None
-        
- 
 
     def update_user_password(self, username, email, new_password):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -100,16 +110,14 @@ class UsersDAO:
                 hashed_password = generate_password_hash(new_password)
                 cursor.execute(sql, (hashed_password, username, email))
                 self.conn.commit()
-                return cursor.rowcount  # number of rows updated
+                return cursor.rowcount
         except pymysql.MySQLError as e:
             print(f"[ERROR] update_user_password: {e}")
             self.conn.rollback()
             return None
 
-
-        
-        
     def delete_user(self, user_id):
+        self.ensure_connection()
         try:
             with self.conn.cursor() as cursor:
                 sql = """
@@ -124,11 +132,5 @@ class UsersDAO:
             self.conn.rollback()
             return None
 
+# Instantiate DAO
 users_dao = UsersDAO()
-
-
-
-"""
-#  References:
-- Amos, D. (2024) Object-Oriented Programming (OOP) in Python. https://realpython.com/python3-object-oriented-programming/.
-"""

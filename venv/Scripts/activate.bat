@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set VIRTUAL_ENV=C:\Users\great\Desktop\ATU\Year 2\Sem 1\web services and applications\WSAA-coursework\IPM-Web-Application\venv
+set VIRTUAL_ENV=C:\Users\great\Desktop\ATU\Year 2\Sem 1\web services and applications\WSAA-coursework\IPM V2\venv
 
 if not defined PROMPT set PROMPT=$P$G
 
